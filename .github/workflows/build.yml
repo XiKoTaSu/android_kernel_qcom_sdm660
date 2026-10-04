@@ -41,19 +41,19 @@ jobs:
         run: |
           cd "$GITHUB_WORKSPACE/workdir"
           mkdir -p neutron
-          # 下载指定版本，-f 让 HTTP 404 直接失败
           curl -fL -o neutron.tar.zst \
             https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/06092026/neutron-clang-06092026.tar.zst
-          # 解压
           tar --zstd -xf neutron.tar.zst -C neutron
-          # 列出解压内容，方便排查目录结构
-          ls -la neutron
-          # 查找 clang 所在 bin 目录，兼容 symlink，不再限定 -type f
-          NEUTRON_BIN="$(find "$GITHUB_WORKSPACE/workdir/neutron" -name clang -print -quit | xargs -r dirname)"
-          if [[ -z "$NEUTRON_BIN" ]]; then
-            echo "未在 Neutron 包中找到 clang，请检查下载内容或版本号"
+
+          # 日志已经确认：解压后直接是 bin/ 和 lib/，没有多余顶层目录
+          NEUTRON_BIN="$GITHUB_WORKSPACE/workdir/neutron/bin"
+
+          # 加一个保险检查，避免工具链结构变化导致后续错误
+          if [[ ! -x "$NEUTRON_BIN/clang" ]]; then
+            echo "错误：$NEUTRON_BIN/clang 不存在"
             exit 1
           fi
+
           echo "NEUTRON_BIN=$NEUTRON_BIN" >> "$GITHUB_ENV"
           "$NEUTRON_BIN/clang" --version
 
