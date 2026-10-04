@@ -747,9 +747,10 @@ CONFIG_DEBUG_ALIGN_RODATA=y
 CONFIG_BACKLIGHT_LCD_SUPPORT=y
 CONFIG_BACKLIGHT_CLASS_DEVICE=y
 
-# Touchscreen (focaltech FTS on i2c_1 @0x38)
-CONFIG_TOUCHSCREEN_FTS=y
-CONFIG_TOUCHSCREEN_FTS_DIRECTORY="focaltech_touch"
+# NOTE: CONFIG_TOUCHSCREEN_FTS is deliberately NOT enabled.  focaltech_core.c
+# calls of_drm_find_panel(), which only exists with CONFIG_DRM_PANEL; this tree
+# drives the panel through fbdev MDSS, so enabling it breaks the build with
+# -Werror,-Wimplicit-function-declaration.  Touch is not needed to boot.
 
 # Pstore / ramoops - required to capture the console+panic dump of a failed boot
 CONFIG_PSTORE=y
@@ -759,5 +760,4 @@ CONFIG_PSTORE_RAM=y
 
 # Misc
 CONFIG_LOCALVERSION_AUTO=y
-CONFIG_QCA_CLD_WLAN=y
 # CONFIG_INPUT_HBTP_INPUT is not set
