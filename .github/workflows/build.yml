@@ -141,5 +141,5 @@ jobs:
         if: env.CHECK_FILE_IS_OK == 'true'
         uses: actions/upload-artifact@v4
         with: 
-        name: Image-gz-dtb
+          name: Image-gz-dtb
           path: workdir/code/source/android/kernel/msm-4.19/out/arch/arm64/boot/Image.gz-dtb
