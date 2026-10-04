@@ -61,6 +61,13 @@ jobs:
           cd $GITHUB_WORKSPACE/workdir/source
           make O=out vendor/sdm660-perf_defconfig
           make -j$(nproc --all) O=out 2>&1 | tee kernel.log
+          # Qualcomm boot images carry the DTB appended to the kernel (Image.gz-dtb).
+          # CONFIG_BUILD_ARM64_APPENDED_DTB_IMAGE is not enabled in this tree, so build it
+          # explicitly instead of relying on the kconfig target.
+          cat out/arch/arm64/boot/Image.gz \
+              out/arch/arm64/boot/dts/vendor/qcom/eebbk/sda660-mtp-H7000.dtb \
+              > out/arch/arm64/boot/Image.gz-dtb
+          ls -l out/arch/arm64/boot/Image.gz out/arch/arm64/boot/Image.gz-dtb
 
       - name: Upload logs
         uses: actions/upload-artifact@v4
@@ -84,6 +91,13 @@ jobs:
         with:
           name: kernel-4.19
           path: workdir/source/out/arch/arm64/boot/Image.gz
+
+      - name: Upload kernel+dtb file
+        if: env.CHECK_FILE_IS_OK == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-dtb-4.19
+          path: workdir/source/out/arch/arm64/boot/Image.gz-dtb
           
       - name: Upload dtb file
         if: env.CHECK_FILE_IS_OK == 'true'
