@@ -330,6 +330,7 @@ sdm660-internal-codec-cdp.dtb \
         sda660-pm660a-mtp.dtb \
         sda660-pm660a-rcm.dtb \
         sda660-pm660a-qrd-hdk.dtb \
+        eebbk/sda660-mtp-H7000.dtb \
         sdm660-headset-jacktype-no-cdp.dtb \
         sdm660-headset-jacktype-no-rcm.dtb \
         sdm660-pm660a-headset-jacktype-no-cdp.dtb \

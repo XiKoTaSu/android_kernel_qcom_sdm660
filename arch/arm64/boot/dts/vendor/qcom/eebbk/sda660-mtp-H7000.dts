@@ -1,0 +1,49 @@
+/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+
+/dts-v1/;
+
+#include "../sda660.dtsi"
+#include "../sdm660-mtp.dtsi"
+#include "../sdm660-external-codec.dtsi"
+#include "sda660-mtp-H7000-overlay.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. EEBBK S5 (H7000)";
+	compatible = "qcom,sda660-mtp", "qcom,sda660", "qcom,mtp";
+	qcom,board-id = <8 0>;
+	qcom,pmic-id = <0x0001001b 0x0101011a 0x0 0x0>,
+			<0x0001001b 0x0201011a 0x0 0x0>,
+			<0x0001001b 0x0102001a 0x0 0x0>;
+
+	/* ramoops: console 256KB / record 64KB / pmsg 128KB */
+	reserved-memory {
+		ramoops_region: ramoops_region@a0119000 {
+			compatible = "ramoops";
+			no-map;
+			reg = <0x0 0xa0119000 0x0 0xe0000>;
+		};
+	};
+
+	ramoops {
+		compatible = "ramoops";
+		memory-region = <&ramoops_region>;
+		record-size = <0x10000>;
+		console-size = <0x40000>;
+		pmsg-size = <0x20000>;
+	};
+};
+
+&tavil_snd {
+	qcom,msm-mbhc-moist-cfg = <0>, <0>, <3>;
+};
