@@ -26,21 +26,34 @@
 			<0x0001001b 0x0201011a 0x0 0x0>,
 			<0x0001001b 0x0102001a 0x0 0x0>;
 
-	/* ramoops: console 256KB / record 64KB / pmsg 128KB */
+	/*
+	 * ramoops: console 256KB / record 64KB / pmsg 128KB inside a 896KB
+	 * region.  This must be a single child of /reserved-memory carrying
+	 * compatible, reg *and* the size properties.  fs/pstore/ram.c only ever
+	 * calls platform_get_resource(pdev, IORESOURCE_MEM, 0), so it takes the
+	 * region from the node's own reg and never follows a memory-region
+	 * phandle.  Splitting the sizes onto a separate node leaves that node
+	 * without a reg, the probe fails, and nothing is ever recorded - which
+	 * is exactly the log we need when a boot attempt dies.
+	 *
+	 * Deliberately no no-map.  ram_core.c picks its mapping with
+	 *     if (pfn_valid(start >> PAGE_SHIFT))  -> persistent_ram_vmap()
+	 *     else                                -> persistent_ram_iomap()
+	 * and arm64 defines pfn_valid() as memblock_is_map_memory(), which is
+	 * false for a no-map region.  That sends us down the iomap path, whose
+	 * request_mem_region() then collides with System RAM and fails, so
+	 * ramoops would map nothing at all.  The stock H7000 pstore region has
+	 * no no-map either; of_reserved_mem still reserves the range, so the
+	 * page allocator will not hand it out.
+	 */
 	reserved-memory {
-		ramoops_region: ramoops_region@a0119000 {
+		ramoops_region: ramoops@a0119000 {
 			compatible = "ramoops";
-			no-map;
 			reg = <0x0 0xa0119000 0x0 0xe0000>;
+			record-size = <0x10000>;
+			console-size = <0x40000>;
+			pmsg-size = <0x20000>;
 		};
-	};
-
-	ramoops {
-		compatible = "ramoops";
-		memory-region = <&ramoops_region>;
-		record-size = <0x10000>;
-		console-size = <0x40000>;
-		pmsg-size = <0x20000>;
 	};
 };
 
