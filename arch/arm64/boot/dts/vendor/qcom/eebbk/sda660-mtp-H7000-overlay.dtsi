@@ -7,6 +7,21 @@
 #include "battery/sda660-battery-H7000.dtsi"
 #include "display/sda660-display-H7000.dtsi"
 
+/*
+ * sdm660.dtsi declares this node as dfps_data_mem@0x9f7ff000 but sets
+ * reg = <0x0 0x9f800000 0x0 0x1000>.  splash_region is
+ * 0x9d400000 + 0x2400000, i.e. it ends exactly at 0x9f800000, so the DFPS
+ * buffer lands one page past the end of the reserved splash area, in
+ * ordinary RAM that the page allocator hands out to other drivers.  The DSI
+ * PLL writing DFPS data then corrupts live memory.
+ *
+ * Both the stock H7000 device tree and the working 4.4 port use 0x9f7ff000
+ * (the last page *inside* splash_region), so restore that value.
+ */
+&dfps_data_mem {
+	reg = <0x0 0x9f7ff000 0x0 0x1000>;
+};
+
 &firmware {
 	android {
 		boot_devices = "soc/c0c4000.sdhci";
