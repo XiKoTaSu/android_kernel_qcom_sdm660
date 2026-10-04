@@ -3,15 +3,13 @@ on:
   workflow_call:
   workflow_dispatch:
   push:
-
-permissions:
-  contents: read
-
+  
 jobs:
   build:
     name: build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
+
       - name: Get branch name
         id: branch-names
         uses: tj-actions/branch-names@v8
@@ -24,126 +22,72 @@ jobs:
       - name: Prepare environment
         run: |
           sudo apt-get update
-          # 基础依赖；Neutron 自带 clang/binutils，不再装交叉GCC
-          sudo apt-get install -y \
-            git automake flex lzop bison gperf build-essential zip curl \
-            zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev \
-            squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make \
-            optipng maven libssl-dev pwgen libswitch-perl policycoreutils \
-            minicom bc libc6-dev-i386 libx11-dev lib32z-dev libgl1-mesa-dev \
-            xsltproc unzip device-tree-compiler \
-            zstd python3 python3-dev python3-venv swig
-          mkdir -p "$GITHUB_WORKSPACE/workdir"
-          cd "$GITHUB_WORKSPACE/workdir"
-          echo "BUILD_TIME=$(TZ=Asia/Shanghai date '+%Y%m%d%H%M')" >> "$GITHUB_ENV"
+          sudo apt-get install git automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python2 python3
+          mkdir -p $GITHUB_WORKSPACE/workdir
+          cd $GITHUB_WORKSPACE/workdir
+          echo "BUILD_TIME=$(TZ=Asia/Shanghai date "+%Y%m%d%H%M")" >> $GITHUB_ENV
 
-      - name: Get Neutron Clang (pure clang toolchain)
+      - name: Get clang toolchain
         run: |
-          cd "$GITHUB_WORKSPACE/workdir"
-          mkdir -p neutron
-          curl -fL -o neutron.tar.zst \
-            https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/06092026/neutron-clang-06092026.tar.zst
-          tar --zstd -xf neutron.tar.zst -C neutron
+          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android13-release/clang-r450784d.tar.gz -O $GITHUB_WORKSPACE/workdir/aosp_clang-r450784d.tar.gz
+          mkdir $GITHUB_WORKSPACE/workdir/clang
+          tar zxvf $GITHUB_WORKSPACE/workdir/aosp_clang-r450784d.tar.gz -C $GITHUB_WORKSPACE/workdir/clang
 
-          # 日志已经确认：解压后直接是 bin/ 和 lib/，没有多余顶层目录
-          NEUTRON_BIN="$GITHUB_WORKSPACE/workdir/neutron/bin"
-
-          # 加一个保险检查，避免工具链结构变化导致后续错误
-          if [[ ! -x "$NEUTRON_BIN/clang" ]]; then
-            echo "错误：$NEUTRON_BIN/clang 不存在"
-            exit 1
-          fi
-
-          echo "NEUTRON_BIN=$NEUTRON_BIN" >> "$GITHUB_ENV"
-          "$NEUTRON_BIN/clang" --version
+      - name: Get gcc toolchain
+        run: |
+          git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 -b lineage-19.1 --depth=1 $GITHUB_WORKSPACE/workdir/gcc
 
       - name: Clone kernel source
         run: |
-          cd "$GITHUB_WORKSPACE/workdir"
-          # 按你的实际内核仓库/分支改；示例保持当前仓库当前分支
-          git clone --recursive \
-            "https://github.com/$GITHUB_REPOSITORY" \
-            -b "${{ steps.branch-names.outputs.current_branch }}" --depth 1 \
-            code/source/android/kernel/msm-4.19
+          git clone --recursive https://github.com/$GITHUB_REPOSITORY/ -b ${{ steps.branch-names.outputs.current_branch }} --depth 1 $GITHUB_WORKSPACE/workdir/source
 
       - name: Setting up ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: build-kernel-neutron-clang
-          max-size: 2G
+         key: build-kernel-mido-kernel
+         max-size: 2G
 
-      - name: Build kernel (Neutron Clang only)
+      - name: Build kernel
         run: |
           export KBUILD_BUILD_HOST=Github-Action
-          export KBUILD_BUILD_USER="${{ github.actor }}"
-          export ARCH=arm64
-          export SUBARCH=arm64
-
-          # 纯 Neutron：PATH 只加 Neutron bin
-          export PATH="${{ env.NEUTRON_BIN }}:$PATH"
-
-          # 编译器/工具变量
-          export CC=clang
-          export HOSTCC=clang
-          export HOSTCXX=clang++
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CLANG_TRIPLE=aarch64-linux-gnu-
-
-          # LLVM 全套工具（Neutron 自带 llvm-*，比系统缺省更稳）
-          export AR=llvm-ar
-          export NM=llvm-nm
-          export OBJCOPY=llvm-objcopy
-          export OBJDUMP=llvm-objdump
-          export STRIP=llvm-strip
-          export READELF=llvm-readelf
-          export LD=ld.lld
-          export RANLIB=llvm-ranlib
-          export READELF=llvm-readelf
-
-          # 老 msm-4.19 用集成汇编器经常有问题；先试 1，报错改 0
-          export LLVM_IAS=1
-
-          KDIR="$GITHUB_WORKSPACE/workdir/code/source/android/kernel/msm-4.19"
-          OUT="$KDIR/out"
-
-          cd "$KDIR"
-          make O=out -j"$(nproc --all)" \
-            CC=clang HOSTCC=clang CROSS_COMPILE=aarch64-linux-gnu- \
-            CLANG_TRIPLE=aarch64-linux-gnu- LD=ld.lld LLVM_IAS=1 \
-            vendor/sdm660-perf_defconfig
-
-          make O=out -j"$(nproc --all)" \
-            CC=clang HOSTCC=clang CROSS_COMPILE=aarch64-linux-gnu- \
-            CLANG_TRIPLE=aarch64-linux-gnu- LD=ld.lld LLVM_IAS=1 \
-            DTC=dtc 2>&1 | tee "$GITHUB_WORKSPACE/workdir/kernel.log"
+          export KBUILD_BUILD_USER=$(echo ${{ github.actor }})
+          export ARCH="arm64"
+          export SUBARCH="arm64"
+          export CROSS_COMPILE="$GITHUB_WORKSPACE/workdir/gcc/bin/aarch64-linux-android-"          
+          export PATH="$GITHUB_WORKSPACE/workdir/clang/bin:$GITHUB_WORKSPACE/workdir/gcc/bin/:$PATH"
+          export LLVM=1
+          export CC="ccache clang"
+          export LD="ld.lld"
+          cd $GITHUB_WORKSPACE/workdir/source
+          make O=out vendor/sdm660-perf_defconfig vendor/h7000.config
+          make -j$(nproc --all) O=out 2>&1 | tee kernel.log
 
       - name: Upload logs
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: neutron_kernel_${{ env.BUILD_TIME }}_log
-          path: workdir/kernel.log
+          name: android_kernel_qcom_sdm660_${{ env.BUILD_TIME }}_kernel.log
+          path: workdir/source/kernel.log
 
       - name: Check kernel file
         run: |
-          OUT="$GITHUB_WORKSPACE/workdir/code/source/android/kernel/msm-4.19/out"
-          if [ -f "$OUT/arch/arm64/boot/Image.gz" ]; then
-            echo "CHECK_FILE_IS_OK=true" >> "$GITHUB_ENV"
+          cd $GITHUB_WORKSPACE/workdir/source
+          if [ -f out/arch/arm64/boot/Image.gz ]; then
+              echo "CHECK_FILE_IS_OK=true" >> $GITHUB_ENV
           else
-            echo "Kernel Image.gz not found"
-            exit 1
+              echo "Kernel output file is empty"
+              exit 1
           fi
 
-      - name: Upload Image.gz
+      - name: Upload kernel file
         if: env.CHECK_FILE_IS_OK == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: Image-gz
-          path: workdir/code/source/android/kernel/msm-4.19/out/arch/arm64/boot/Image.gz
-
-      - name: Upload Image.gz-dtb
+          name: kernel-4.19
+          path: workdir/source/out/arch/arm64/boot/Image.gz
+          
+      - name: Upload dtb file
         if: env.CHECK_FILE_IS_OK == 'true'
         uses: actions/upload-artifact@v4
-        with: 
-          name: Image-gz-dtb
-          path: workdir/code/source/android/kernel/msm-4.19/out/arch/arm64/boot/Image.gz-dtb
+        with:
+          name: dtb-4.19
+          path: workdir/source/out/arch/arm64/boot/dts/vendor/qcom-eebbk/*.dtb
