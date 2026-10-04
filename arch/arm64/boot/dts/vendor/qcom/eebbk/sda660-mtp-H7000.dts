@@ -36,15 +36,14 @@
 	 * without a reg, the probe fails, and nothing is ever recorded - which
 	 * is exactly the log we need when a boot attempt dies.
 	 *
-	 * Deliberately no no-map.  ram_core.c picks its mapping with
-	 *     if (pfn_valid(start >> PAGE_SHIFT))  -> persistent_ram_vmap()
-	 *     else                                -> persistent_ram_iomap()
-	 * and arm64 defines pfn_valid() as memblock_is_map_memory(), which is
-	 * false for a no-map region.  That sends us down the iomap path, whose
-	 * request_mem_region() then collides with System RAM and fails, so
-	 * ramoops would map nothing at all.  The stock H7000 pstore region has
-	 * no no-map either; of_reserved_mem still reserves the range, so the
-	 * page allocator will not hand it out.
+	 * No no-map, matching the stock pstore-reserved-mem node, which also
+	 * carries none.  Without it the range stays in the linear map, so
+	 * pfn_valid() is true and ram_core.c takes the persistent_ram_vmap()
+	 * branch.  (no-map would work too: arm64 then publishes the range as a
+	 * non-busy "reserved" iomem resource, so request_mem_region() in the
+	 * iomap branch still succeeds - but the plain mapping is the one the
+	 * stock tree uses.)  Either way of_reserved_mem reserves the range, so
+	 * the page allocator will not hand it out.
 	 */
 	reserved-memory {
 		ramoops_region: ramoops@a0119000 {
