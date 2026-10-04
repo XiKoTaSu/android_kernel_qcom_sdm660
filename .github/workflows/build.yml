@@ -41,13 +41,19 @@ jobs:
         run: |
           cd "$GITHUB_WORKSPACE/workdir"
           mkdir -p neutron
-          # 你指定的固定版本
-          curl -L -o neutron.tar.zst \
+          # 下载指定版本，-f 让 HTTP 404 直接失败
+          curl -fL -o neutron.tar.zst \
             https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/06092026/neutron-clang-06092026.tar.zst
-          # 解压；Neutron 包通常会解出一个含 bin/ 的目录，下面做自适应
+          # 解压
           tar --zstd -xf neutron.tar.zst -C neutron
-          # 找到 clang 可执行文件所在 bin 目录
-          NEUTRON_BIN="$(find "$GITHUB_WORKSPACE/workdir/neutron" -type f -name clang | head -n1 | xargs dirname)"
+          # 列出解压内容，方便排查目录结构
+          ls -la neutron
+          # 查找 clang 所在 bin 目录，兼容 symlink，不再限定 -type f
+          NEUTRON_BIN="$(find "$GITHUB_WORKSPACE/workdir/neutron" -name clang -print -quit | xargs -r dirname)"
+          if [[ -z "$NEUTRON_BIN" ]]; then
+            echo "未在 Neutron 包中找到 clang，请检查下载内容或版本号"
+            exit 1
+          fi
           echo "NEUTRON_BIN=$NEUTRON_BIN" >> "$GITHUB_ENV"
           "$NEUTRON_BIN/clang" --version
 
@@ -96,8 +102,6 @@ jobs:
 
           # 老 msm-4.19 用集成汇编器经常有问题；先试 1，报错改 0
           export LLVM_IAS=1
-          # DTC：优先用 Neutron 自带，没有再用系统 device-tree-compiler
-          export DTC=dtc
 
           KDIR="$GITHUB_WORKSPACE/workdir/code/source/android/kernel/msm-4.19"
           OUT="$KDIR/out"
