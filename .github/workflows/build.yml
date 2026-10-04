@@ -59,7 +59,7 @@ jobs:
           export CC="ccache clang"
           export LD="ld.lld"
           cd $GITHUB_WORKSPACE/workdir/source
-          make O=out vendor/sdm660-perf_defconfig vendor/h7000.config
+          make O=out vendor/sdm660-perf_defconfig
           make -j$(nproc --all) O=out 2>&1 | tee kernel.log
 
       - name: Upload logs
@@ -90,4 +90,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dtb-4.19
-          path: workdir/source/out/arch/arm64/boot/dts/vendor/qcom-eebbk/*.dtb
+          path: workdir/source/out/arch/arm64/boot/dts/vendor/qcom/eebbk/*.dtb
